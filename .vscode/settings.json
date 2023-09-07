@@ -1,0 +1,6 @@
+{
+	"C_Cpp.clang_format_fallbackStyle": "",
+	"C_Cpp.clang_format_style": "",
+	"C_Cpp.formatting": "vcFormat",
+	"cmake.configureOnOpen": false
+}
