@@ -58,6 +58,10 @@ void loop() {
             matrix.setOutput(x, val);
         }
       }
+      else if (strcmp(cmd, "sync") == 0) {
+        uint32_t time = matrix.SyncBuffers();
+        Serial.printf("Tiempo de sincronizacion: %i us\n", time);
+      }
       else {
         count = sscanf(cmd, "%d = %f", &out, &val);
         if (count == 2) {

@@ -38,7 +38,7 @@ void LEDshift::Init(int32_t outClock, int32_t regCount, int32_t regWide, const P
 	LatPulsePos = constrain(latPos, 0, (regWide - 1));
 	ReverseBitsOrder = reverseBits;
 	I2Sdev = &I2S1;
-	fastMode = true;
+	bcdMode = true;
 
 	//Iniciar todos los buffers que usan memoria dinámica a null
 	LedsData = NULL;
@@ -80,10 +80,10 @@ int32_t LEDshift::Begin(int32_t pwmBitResolution)
 
 	int32_t CantLeds = RegCount * RegWide;
 	int32_t bufferSize = RegWide * BitDeep * sizeof(*OutputData0);		//Tamaño del buffer en modo rápido (en bytes)
-	if (!fastMode) bufferSize = RegWide * bitSteps[BitDeep] * sizeof(*OutputData0);		//en modo lento
+	if (!bcdMode) bufferSize = RegWide * bitSteps[BitDeep] * sizeof(*OutputData0);		//en modo lento
 	int32_t outFreq = OutClock / RegWide / bitSteps[BitDeep];							//Frecuencia de PWM generado
 
-	Serial.printf("Iniciando configuracion de modulo I2S paralelo en modo %s...\n", fastMode ? "rapido" : "lento");
+	Serial.printf("Iniciando configuracion de modulo I2S paralelo, leds en modo %s...\n", bcdMode ? "PWM BCD" : "PWM");
 	Serial.printf(" Cantidad de registros: %i, ancho de registros: %i\n", RegCount, RegWide);
 	Serial.printf(" Mapeo de pines -> CLK: %d, LAT: %d, D0: %d, D1: %d, D2: %d, D3: %d, D4: %d, D5: %d, D6: %d, D7: %d\n",
 		PinOut->CLK, PinOut->LAT, PinOut->D0, PinOut->D1, PinOut->D2, PinOut->D3, PinOut->D4, PinOut->D5, PinOut->D6, PinOut->D7);
@@ -121,11 +121,11 @@ int32_t LEDshift::Begin(int32_t pwmBitResolution)
 	*/
 	Serial.printf("Preparando descriptores de buffers...\n");
 	int32_t descSize = sizeof(i2s_parallel_buffer_desc_t) * (bitSteps[BitDeep]);	//Modo rápido
-	if (!fastMode) descSize = sizeof(i2s_parallel_buffer_desc_t) * 2;	//Modo lento
+	if (!bcdMode) descSize = sizeof(i2s_parallel_buffer_desc_t) * 2;	//Modo lento
 
 	i2s_parallel_buffer_desc_t* buffDesc;
 	buffDesc = (i2s_parallel_buffer_desc_t*)malloc(descSize);
-	Serial.printf("Asignando %u bytes para %u descriptores... %s\n", descSize, fastMode ? bitSteps[BitDeep] : 2, buffDesc ? "Ok" : "Fallo");
+	Serial.printf("Asignando %u bytes para %u descriptores... %s\n", descSize, bcdMode ? bitSteps[BitDeep] : 2, buffDesc ? "Ok" : "Fallo");
 	if (buffDesc == NULL) return -2;
 	memUsed += descSize;
 
@@ -135,7 +135,7 @@ int32_t LEDshift::Begin(int32_t pwmBitResolution)
 		uint16_t* pointer = buffId == 0 ? OutputData0 : OutputData1;
 
 		Index = 0;
-		if (fastMode) {
+		if (bcdMode) {
 			for (ColorBit = 0; ColorBit < BitDeep; ColorBit++) {
 				for (Bit = 0; Bit < bitSteps[ColorBit]; Bit++) {
 					buffDesc[Index].memory = (void*)pointer;
@@ -277,50 +277,7 @@ void LEDshift::PrintBuffer()
 
 }
 
-
 uint32_t LEDshift::SyncBuffers()
-{
-	uint32_t Timing = micros();
-
-	//Esperar que se termine de escribir el buffer anterior para evitar flicker (timeout 2500us)
-	uint32_t timeout = micros();
-	while (!i2s_parallel_is_previous_buffer_free()) {
-		if (micros() - timeout > (maxWaiting * 2)) break;
-	};
-
-	uint16_t* p = BufferID ? OutputData0 : OutputData1;	//Seleccionar el buffer libre
-
-	//Crear el buffer de salida iterando por los bits de profundidad
-	for (int32_t frame = 0; frame < BitDeep; frame++) {
-		int32_t bitMask = 0x1 << frame;
-		//Serial.printf("Frame: %i\n", frame);
-		for (int32_t bit = 0; bit < RegWide; bit++) {		//Iterar por cada bit del ancho del registro de desplazamiento
-			int32_t out = 0;
-
-			for (int32_t reg = 0; reg < RegCount; reg++) {
-				// Orden inverso: LedsData[(RegWide - bit - 1) + reg * RegWide]; orden normal : LedsData[bit + reg * RegWide];
-				int32_t index = (ReverseBitsOrder ? bit : (RegWide - bit - 1)) + reg * RegWide;
-				int32_t val = LedsData[index];
-				int32_t bitVal = 0x1 << reg;
-				if (val & bitMask)
-					out |= bitVal;
-			}
-			// if (bit == (RegWide - 1))
-			if (bit == LatPulsePos)
-				out |= 0x100;
-
-			//El módulo I2S lee primero los 16 bits de más peso (al revez de como se generan los datos) 
-			//por lo que se debe invertir el orden en el que se escriben en el buffer
-			*reverseAddress(p++) = out;
-			//Serial.printf(" Bit: %i -> out: %0.4X\n", bit, out);
-		}
-	}
-	BufferID = BufferID ? 0 : 1;	//Cambiar de buffer
-	i2s_parallel_flip_to_buffer(I2Sdev, BufferID);
-	return micros() - Timing;
-}
-
-uint32_t LEDshift::SyncBuffers2()
 {
 	uint32_t Timing = micros();
 
@@ -335,7 +292,7 @@ uint32_t LEDshift::SyncBuffers2()
 		int32_t bitMask = 0x1 << frame;
 		pInit = p; //Guardar direccion de inicio del frame
 
-		Serial.printf("frame %d: p=%p, pInit: %p\n", frame, p, pInit);
+		// Serial.printf("frame %d: p=%p, pInit: %p\n", frame, p, pInit);
 		for (int32_t bit = 0; bit < RegWide; bit++) {		//Iterar por cada bit del ancho del registro de desplazamiento
 			int32_t out = 0;
 
@@ -351,11 +308,11 @@ uint32_t LEDshift::SyncBuffers2()
 			*reverseAddress(p++) = out;	//Guardar dato en buffer
 		}
 		//En este modo, se deben copiar el mismo bloque de datos varias veces en el buffer
-		if (!fastMode) {
+		if (!bcdMode) {
 			int_fast32_t max = bitSteps[frame];	//Cantidad de veces a copiar: peso del bit menos 1 que ya copiamos
 			int_fast32_t size = RegWide * sizeof(*OutputData0);	//Cantidad de bytes a copiar uint16_t son 2 bytes
 			for (uint_fast32_t i = 1; i < max; i++) {
-				Serial.printf("frame %d: p=%p, pInit: %p\n", frame, p, pInit);
+				// Serial.printf("frame %d: p=%p, pInit: %p\n", frame, p, pInit);
 				memcpy(p, pInit, size);	//Copiar el bloque ya procesado 
 				p += RegWide;	//este puntero incrementa de a 2 porque apunta a uint16_t
 			}
@@ -373,7 +330,7 @@ void LEDshift::loop()
 	//Actualiza solo cuando el buffer de salida se transfirió completamente.
 	if (updateOuts && i2s_parallel_is_previous_buffer_free()) {
 		updateOuts = 0;
-		SyncBuffers2();
+		SyncBuffers();
 	}
 }
 
@@ -401,6 +358,49 @@ float LEDshift::getOutput(int32_t out)
 
 
 
+
+
+// uint32_t LEDshift::SyncBuffers()
+// {
+// 	uint32_t Timing = micros();
+
+// 	//Esperar que se termine de escribir el buffer anterior para evitar flicker (timeout 2500us)
+// 	uint32_t timeout = micros();
+// 	while (!i2s_parallel_is_previous_buffer_free()) {
+// 		if (micros() - timeout > (maxWaiting * 2)) break;
+// 	};
+
+// 	uint16_t* p = BufferID ? OutputData0 : OutputData1;	//Seleccionar el buffer libre
+
+// 	//Crear el buffer de salida iterando por los bits de profundidad
+// 	for (int32_t frame = 0; frame < BitDeep; frame++) {
+// 		int32_t bitMask = 0x1 << frame;
+// 		//Serial.printf("Frame: %i\n", frame);
+// 		for (int32_t bit = 0; bit < RegWide; bit++) {		//Iterar por cada bit del ancho del registro de desplazamiento
+// 			int32_t out = 0;
+
+// 			for (int32_t reg = 0; reg < RegCount; reg++) {
+// 				// Orden inverso: LedsData[(RegWide - bit - 1) + reg * RegWide]; orden normal : LedsData[bit + reg * RegWide];
+// 				int32_t index = (ReverseBitsOrder ? bit : (RegWide - bit - 1)) + reg * RegWide;
+// 				int32_t val = LedsData[index];
+// 				int32_t bitVal = 0x1 << reg;
+// 				if (val & bitMask)
+// 					out |= bitVal;
+// 			}
+// 			// if (bit == (RegWide - 1))
+// 			if (bit == LatPulsePos)
+// 				out |= 0x100;
+
+// 			//El módulo I2S lee primero los 16 bits de más peso (al revez de como se generan los datos) 
+// 			//por lo que se debe invertir el orden en el que se escriben en el buffer
+// 			*reverseAddress(p++) = out;
+// 			//Serial.printf(" Bit: %i -> out: %0.4X\n", bit, out);
+// 		}
+// 	}
+// 	BufferID = BufferID ? 0 : 1;	//Cambiar de buffer
+// 	i2s_parallel_flip_to_buffer(I2Sdev, BufferID);
+// 	return micros() - Timing;
+// }
 
 
 

@@ -49,9 +49,8 @@ private:
 	const PinDef_t dftPins = { 27, 26, 25, 5, -1, -1 , -1 , -1 , -1 , -1 };
 	const uint32_t bitSteps[13] = { 1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096 };
 
-public:
 	bool Ok = false;
-	bool fastMode;			//Indica el modo de funcionamiento, en modo fast usa mucha ram y sinconiza rápido, sino usa poca RAM y sincroniza más lento
+	bool bcdMode;			//Indica el modo de funcionamiento PWM BCD o PWM normal
 	int32_t RegCount;		//Cantidad de pines de datos usados (max 8)
 	int32_t RegWide;		//Cantidad de bits de salida de los registros de desplazamiento(8 para 74HC595)
 	int32_t BitDeep;		//Bits de resolución del PWM (min 4, max 16)
@@ -75,37 +74,30 @@ public:
 
 	uint32_t updateOuts;		//Indica que hay un cambio en las salidas y se debe refrescar
 
+	void Init(int32_t outClock, int32_t regCount, int32_t regWide, const PinDef_t* pinOut, int32_t, bool reverseBits);
+
+
+public:
+
 	LEDshift(int32_t outClock, int32_t regCount, int32_t regWide, PinDef_t* pinOut, int32_t latPos, bool reverseBits);
 
 	LEDshift(int32_t outClock, int32_t regCount, int32_t regWide, int32_t latPos, bool reverseBits);
 
 	~LEDshift();
 
-	void Init(int32_t outClock, int32_t regCount, int32_t regWide, const PinDef_t* pinOut, int32_t, bool reverseBits);
-
 	int32_t Begin(int32_t bitResolution);
-
-	void setClock(uint32_t Clock);
 
 	void setOutput(int32_t out, float Value);
 
 	float getOutput(int32_t out);
 
-	uint32_t SyncBuffers();
-
-	uint32_t SyncBuffers2();
-
 	void loop();
-
-	void Sync();
 
 	void PrintBuffer();
 
+	uint32_t SyncBuffers();
+
 };
-
-
-void Test(LEDshift* src);
-
 
 
 #endif // !__LEDMATRIX_H
