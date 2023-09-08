@@ -7,7 +7,7 @@ LEDshift matrix(17500000L, 2, 8, 0, false);
 void setup() {
   Serial.begin(115200);
 
-  matrix.Begin(LS_12bitsDeep);
+  matrix.Begin(LS_10bitsDeep);
   // matrix.setClock(10000000L);
   int32_t time2 = matrix.SyncBuffers();
   Serial.printf("Tiempo de sincronizado: %i us\n", time2);
@@ -16,11 +16,11 @@ void setup() {
   // matrix.setOutput(0, 1.0);
   matrix.setOutput(8, 1.0);
 
-  uint16_t* p = (uint16_t*)malloc(2048 * 2), *add, *pa;
+  uint16_t* p = (uint16_t*)malloc(2048 * 2), * add, * pa;
 
   uint32_t time = micros(), val, counter = 0;
   for (int_fast16_t max = 1; max <= 2048; max *= 2) {
-    
+
     for (int_fast16_t i = 0; i < 8; i++)
       p[i] = rand();
 
@@ -53,7 +53,7 @@ void setup() {
   time = micros() - time;
 
   Serial.printf("Las copias con memcpy de %d tomaron %d us\n", counter, time);
-  
+
   // free(p);
 }
 
