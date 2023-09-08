@@ -1,5 +1,4 @@
 #include <Arduino.h>
-#include "i2s_par.h"
 #include "LEDshift.h"
 
 LEDshift matrix(17500000L, 2, 8, 0, false);
@@ -15,46 +14,6 @@ void setup() {
 
   // matrix.setOutput(0, 1.0);
   matrix.setOutput(8, 1.0);
-
-  uint16_t* p = (uint16_t*)malloc(2048 * 2), * add, * pa;
-
-  uint32_t time = micros(), val, counter = 0;
-  for (int_fast16_t max = 1; max <= 2048; max *= 2) {
-
-    for (int_fast16_t i = 0; i < 8; i++)
-      p[i] = rand();
-
-    add = &p[8];
-    pa = p;
-    for (int_fast16_t i = 1; i < max; i++) {
-      *add++ = *pa++;
-      counter++;
-    }
-  }
-  time = micros() - time;
-
-  Serial.printf("Las copias con punteros %d tomaron %d us\n", counter, time);
-
-
-
-  time = micros(); counter = 0;
-  for (int16_t max = 1; max <= 2048; max *= 2) {
-    //crear un bloque de 8 words
-    for (int_fast16_t i = 0; i < 8; i++)
-      p[i] = rand();
-
-    add = &p[8];
-    for (int_fast16_t i = 1; i < max; i += 8) {
-      memcpy(add, p, 16);
-      add += 16;
-      counter++;
-    }
-  }
-  time = micros() - time;
-
-  Serial.printf("Las copias con memcpy de %d tomaron %d us\n", counter, time);
-
-  // free(p);
 }
 
 
