@@ -1,6 +1,6 @@
 #include <Arduino.h>
 #include "i2s_par.h"
-#include "i2s_shift.h"
+#include "LEDshift.h"
 
 LEDshift matrix(17500000L, 2, 8, 0, false);
 
