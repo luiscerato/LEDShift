@@ -6,7 +6,7 @@ LEDshift matrix(17500000L, 2, 8, 0, false);
 void setup() {
   Serial.begin(115200);
 
-  matrix.Begin(LS_10bitsDeep);
+  matrix.Begin(LS_12bitsDeep);
   // matrix.setClock(10000000L);
   int32_t time2 = matrix.SyncBuffers();
   Serial.printf("Tiempo de sincronizado: %i us\n", time2);
